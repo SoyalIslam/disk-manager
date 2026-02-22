@@ -68,9 +68,9 @@ def iter_nodes(node: dict):
 
 
 def _rota_to_kind(rota: object) -> str:
-    if str(rota).strip() == "1":
+    if rota is True or str(rota).strip() == "1":
         return "HDD"
-    if str(rota).strip() == "0":
+    if rota is False or str(rota).strip() == "0":
         return "SSD"
     return "UNKNOWN"
 
@@ -117,7 +117,7 @@ def _mount_with_read_only_fallback(part: Partition, mountpoint: Path) -> Tuple[b
 
 
 def _luks_mapper_name(part: Partition) -> str:
-    safe = part.kname.replace("/", "-")
+    safe = Path(part.kname).name.replace("/", "-")
     return f"diskman-{safe}"
 
 
@@ -173,6 +173,8 @@ def _resolve_luks_inner(part: Partition) -> str:
 def _physical_disk_path(node: dict, top_path: str) -> str:
     pkname = (node.get("pkname") or "").strip()
     if pkname:
+        if pkname.startswith("/dev/"):
+            return pkname
         return f"/dev/{pkname}"
     return top_path
 
@@ -435,6 +437,8 @@ def fstab_line_for_partition(part: Partition, base_dir: Path) -> str:
         raise CommandError(f"Missing UUID for {part.path}; cannot persist in fstab safely.")
     if not is_mountable(part):
         raise CommandError(f"Partition is not mountable: {part.path}")
+    if part.is_luks:
+        raise CommandError(f"Refusing to persist raw LUKS container in fstab: {part.path}")
     mnt = target_mount_point(part, base_dir)
     opts = _pick_mount_options(part, read_only=False)
     return f"UUID={part.uuid} {mnt} {part.fstype} {opts} 0 2 # {DISKMAN_FSTAB_TAG} {part.path}"

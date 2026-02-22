@@ -1,0 +1,25 @@
+# Maintainer: Your Name <you@example.com>
+pkgname=diskman
+pkgver=0.2.0
+pkgrel=1
+pkgdesc='CLI + TUI disk manager with SMART, LUKS, and automount helpers'
+arch=('any')
+url='https://github.com/gaffer/disk-manager'
+license=('MIT')
+depends=('python' 'python-rich' 'util-linux' 'cryptsetup' 'smartmontools')
+makedepends=('python-build' 'python-installer' 'python-setuptools' 'python-wheel')
+source=("${pkgname}-${pkgver}.tar.gz::https://github.com/gaffer/disk-manager/archive/refs/tags/v${pkgver}.tar.gz")
+sha256sums=('SKIP')
+
+build() {
+  cd "disk-manager-${pkgver}"
+  python -m build --wheel --no-isolation
+}
+
+package() {
+  cd "disk-manager-${pkgver}"
+  python -m installer --destdir="$pkgdir" dist/*.whl
+
+  install -Dm644 systemd/diskman-automount.service "$pkgdir/usr/lib/systemd/system/diskman-automount.service"
+  install -Dm644 systemd/diskman-automount.timer "$pkgdir/usr/lib/systemd/system/diskman-automount.timer"
+}

@@ -1,0 +1,14 @@
+[Unit]
+Description=diskman automatic partition mount job
+Documentation=https://github.com/gaffer/disk-manager
+After=local-fs.target
+Wants=local-fs.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/diskman automount
+Nice=10
+IOSchedulingClass=best-effort
+
+[Install]
+WantedBy=multi-user.target
