@@ -120,6 +120,31 @@ python3 -m build
 ./scripts/build_binary.sh
 ```
 
+### GitHub Actions: Publish to PyPI
+
+This repo includes:
+
+- `.github/workflows/publish-pypi.yml`
+
+Set these repository secrets in GitHub:
+
+- `PYPI_API_TOKEN`
+- `TEST_PYPI_API_TOKEN`
+
+Workflow usage:
+
+1. Manual publish to TestPyPI:
+   - Actions -> `Publish Python Package` -> `Run workflow` -> target `testpypi`
+2. Manual publish to PyPI:
+   - Actions -> `Publish Python Package` -> `Run workflow` -> target `pypi`
+3. Auto publish to PyPI on tag:
+   - Push tag `vX.Y.Z` matching `pyproject.toml` version
+
+```bash
+git tag v0.2.1
+git push origin v0.2.1
+```
+
 ---
 
 ## 📄 License
