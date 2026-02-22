@@ -9,14 +9,17 @@ from .core import (
     collect_partitions,
     disable_persistent_mount,
     enable_persistent_mount,
+    is_mount_read_only,
     is_luks_open,
     is_mountable,
     is_root_partition,
+    lock_luks_async,
     mount_partition_async,
     persistent_mount_map,
     require_root,
     root_sources,
     smart_health,
+    unlock_luks_async,
     umount_partition_async,
 )
 
@@ -50,7 +53,7 @@ def run_tui(base_dir: Path) -> None:
         stdscr.nodelay(True)
         stdscr.keypad(True)
         index = 0
-        nav = "r:refresh  a:auto-mount  m:mount/unmount  p:toggle boot mount  q:quit"
+        nav = "r:refresh a:auto m:mount/unmount u:unlock l:lock p:boot q:quit"
         status = "Ready"
         parts = collect_partitions()
         pending: Future | None = None
@@ -95,6 +98,8 @@ def run_tui(base_dir: Path) -> None:
                     flags.append("ROOT")
                 if part.mounted:
                     flags.append("MOUNTED")
+                    if is_mount_read_only(part):
+                        flags.append("RO")
                 if not is_mountable(part):
                     flags.append("SKIP")
                 if part.is_luks:
@@ -157,6 +162,38 @@ def run_tui(base_dir: Path) -> None:
                 except Exception as exc:
                     status = f"Error: {exc}"
                 parts = collect_partitions()
+            elif key == ord("u") and parts and not pending:
+                part = parts[index]
+                try:
+                    require_root()
+                    if not part.is_luks:
+                        status = f"Not LUKS: {part.path}"
+                    elif is_luks_open(part):
+                        status = f"Already unlocked: {part.path}"
+                    else:
+                        status = "Enter LUKS passphrase"
+                        stdscr.addnstr(2, 0, f"Result: {status}", w - 1)
+                        stdscr.refresh()
+                        passphrase = _prompt_hidden(stdscr, min(h - 1, 3), 0, "LUKS passphrase: ")
+                        pending = unlock_luks_async(part, passphrase)
+                        pending_action = f"unlock {part.path}"
+                        status = f"Started {pending_action}"
+                except Exception as exc:
+                    status = f"Error: {exc}"
+            elif key == ord("l") and parts and not pending:
+                part = parts[index]
+                try:
+                    require_root()
+                    if not part.is_luks:
+                        status = f"Not LUKS: {part.path}"
+                    elif not is_luks_open(part):
+                        status = f"Already locked: {part.path}"
+                    else:
+                        pending = lock_luks_async(part)
+                        pending_action = f"lock {part.path}"
+                        status = f"Started {pending_action}"
+                except Exception as exc:
+                    status = f"Error: {exc}"
             elif key == ord("p") and parts and not pending:
                 part = parts[index]
                 try:

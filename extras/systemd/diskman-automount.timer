@@ -1,0 +1,13 @@
+[Unit]
+Description=Run diskman automount periodically
+Documentation=https://github.com/gaffer/disk-manager
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=10min
+AccuracySec=30s
+Persistent=true
+Unit=diskman-automount.service
+
+[Install]
+WantedBy=timers.target

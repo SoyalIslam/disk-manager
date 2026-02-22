@@ -304,6 +304,16 @@ def smart_health(part: Partition) -> str:
     return _smart_health_for_disk(part.disk_path)
 
 
+def is_mount_read_only(part: Partition) -> bool:
+    if not part.mountpoint:
+        return False
+    proc = run_cmd_proc(["findmnt", "-n", "-o", "OPTIONS", "--target", part.mountpoint])
+    if proc.returncode != 0:
+        return False
+    options = (proc.stdout or "").strip().split(",")
+    return "ro" in options
+
+
 def mount_partition(
     part: Partition,
     base_dir: Path,
@@ -405,6 +415,14 @@ def umount_partition_async(
     lock_luks_after: bool = False,
 ) -> Future[Tuple[bool, str]]:
     return _executor.submit(umount_partition, part, root_devs, lock_luks_after)
+
+
+def unlock_luks_async(part: Partition, passphrase: str) -> Future[str]:
+    return _executor.submit(unlock_luks, part, passphrase)
+
+
+def lock_luks_async(part: Partition) -> Future[str]:
+    return _executor.submit(lock_luks, part)
 
 
 def persistent_mount_map(fstab_path: Path = DEFAULT_FSTAB_PATH) -> dict[str, str]:

@@ -1,0 +1,52 @@
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Build and packaging artifacts
+build/
+*.egg-info/
+.eggs/
+*.egg
+
+# PyInstaller artifacts
+*.spec
+
+# Local binary outputs
+/bin/
+/diskman
+/release/
+/packages/
+/packages-test/
+
+# Legacy output path (kept for cleanup safety)
+/dist/
+
+# Test and coverage
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Type checker / linter caches
+.mypy_cache/
+.ruff_cache/
+.pyre/
+
+# Docs generated artifacts
+extras/docs/*.pdf
+
+# IDE/editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS noise
+.DS_Store
+Thumbs.db

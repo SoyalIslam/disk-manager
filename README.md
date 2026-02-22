@@ -17,13 +17,17 @@
 disk-manager/
 ├── pyproject.toml
 ├── README.md
-├── systemd/
-│   ├── diskman-automount.service
-│   └── diskman-automount.timer
-├── packaging/
-│   └── aur/
-│       ├── PKGBUILD
-│       └── .SRCINFO
+├── extras/
+│   ├── docs/
+│   │   ├── diskman-detailed-guide.md
+│   │   └── diskman-detailed-guide.pdf
+│   ├── systemd/
+│   │   ├── diskman-automount.service
+│   │   └── diskman-automount.timer
+│   └── packaging/
+│       └── aur/
+│           ├── PKGBUILD
+│           └── .SRCINFO
 ├── scripts/
 │   └── build_binary.sh
 └── src/
@@ -43,11 +47,25 @@ disk-manager/
 - For SMART: `smartctl` from `smartmontools`
 - `sudo` for mount/unmount/crypt actions
 
-## Install
+## Install From Source
 
 ```bash
 cd /home/gaffer/Documents/disk-manager
 python3 -m pip install .
+```
+
+## Install From PyPI (for everyone)
+
+After you publish to PyPI, anyone can install directly with:
+
+```bash
+python3 -m pip install --upgrade diskman
+```
+
+Then run:
+
+```bash
+diskman --help
 ```
 
 ## CLI Usage
@@ -75,6 +93,8 @@ sudo diskman tui
 - `r`: refresh
 - `a`: async automount
 - `m`: async mount/unmount (prompts for LUKS passphrase when needed)
+- `u`: async unlock selected LUKS device
+- `l`: async lock selected LUKS device
 - `p`: toggle persistent reboot auto-mount
 - `q`: quit
 
@@ -83,8 +103,8 @@ sudo diskman tui
 Install units:
 
 ```bash
-sudo install -Dm644 systemd/diskman-automount.service /etc/systemd/system/diskman-automount.service
-sudo install -Dm644 systemd/diskman-automount.timer /etc/systemd/system/diskman-automount.timer
+sudo install -Dm644 extras/systemd/diskman-automount.service /etc/systemd/system/diskman-automount.service
+sudo install -Dm644 extras/systemd/diskman-automount.timer /etc/systemd/system/diskman-automount.timer
 ```
 
 Enable periodic automount:
@@ -102,16 +122,84 @@ sudo systemctl start diskman-automount.service
 
 ## AUR Packaging
 
-Files are in `packaging/aur/`:
-- `packaging/aur/PKGBUILD`
-- `packaging/aur/.SRCINFO`
+Files are in `extras/packaging/aur/`:
+- `extras/packaging/aur/PKGBUILD`
+- `extras/packaging/aur/.SRCINFO`
 
-If you publish tags (for example `v0.2.0`), users can build via `makepkg -si` from the AUR package directory.
+If you publish tags (for example `v0.2.1`), users can build via `makepkg -si` from the AUR package directory.
 
 ## Build Standalone Binary
 
 ```bash
 cd /home/gaffer/Documents/disk-manager
 ./scripts/build_binary.sh
-./dist/diskman
+./bin/diskman
+```
+
+Install locally as plain `diskman` command:
+
+```bash
+./scripts/install_local_binary.sh
+diskman --help
+```
+
+Note:
+- You can run read-only commands (like `diskman list` and opening `diskman tui`) without `sudo`.
+- Privileged operations (mount/umount/luks lock-unlock/boot-add-remove) still require `sudo` on Linux.
+
+## Publish Package + Binary Releases
+
+### 0. Prepare publish environment
+
+```bash
+python3 -m venv .venv
+. .venv/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -r requirements-dev.txt
+```
+
+### 1. Publish to PyPI
+
+```bash
+export TWINE_USERNAME=__token__
+export TWINE_PASSWORD='pypi-xxxxxxxxxxxxxxxx'
+./scripts/publish_pypi.sh
+```
+
+TestPyPI publish (recommended first):
+
+```bash
+export TWINE_USERNAME=__token__
+export TWINE_PASSWORD='pypi-xxxxxxxxxxxxxxxx'
+export REPOSITORY_URL='https://test.pypi.org/legacy/'
+./scripts/publish_pypi.sh
+```
+
+### 2. Build release binary asset
+
+```bash
+./scripts/package_release_binary.sh 0.2.1
+```
+
+This creates:
+
+- `release/diskman-linux-x86_64`
+- `release/diskman-linux-x86_64-v0.2.1.tar.gz`
+- sha256 files for both artifacts
+
+Upload `diskman-linux-x86_64` (or tar.gz) to GitHub Release tag `v0.2.1`.
+
+### 3. End-user direct binary install
+
+Anyone can install your binary without Python project setup:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/gaffer/disk-manager/main/scripts/install_binary.sh -o /tmp/install_diskman.sh
+bash /tmp/install_diskman.sh 0.2.1 gaffer/disk-manager
+```
+
+Or locally:
+
+```bash
+./scripts/install_binary.sh 0.2.1 gaffer/disk-manager
 ```
