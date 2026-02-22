@@ -1,196 +1,131 @@
 # diskman
 
-`diskman` is a Linux disk/partition manager with:
-- CLI commands and terminal TUI
-- Filesystem-aware mount options (including SSD/HDD-aware tuning)
-- SMART health visibility per device
-- LUKS auto-detection and unlock support
-- Read-only fallback when writable mount fails
-- Non-blocking async mount/umount/automount operations
-- Reboot auto-mount selection (persistent via `/etc/fstab`)
-- systemd service/timer integration
-- AUR packaging metadata
+[![PyPI version](https://img.shields.io/pypi/v/diskman.svg)](https://pypi.org/project/diskman/)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
 
-## Project Structure
+**diskman** is a lightweight, terminal-first Linux disk and partition manager. It provides a powerful CLI and an interactive TUI for day-to-day storage administration, featuring SMART health monitoring, LUKS encryption support, and filesystem-aware automounting.
 
-```text
-disk-manager/
-├── pyproject.toml
-├── README.md
-├── extras/
-│   ├── docs/
-│   │   ├── diskman-detailed-guide.md
-│   │   └── diskman-detailed-guide.pdf
-│   ├── systemd/
-│   │   ├── diskman-automount.service
-│   │   └── diskman-automount.timer
-│   └── packaging/
-│       └── aur/
-│           ├── PKGBUILD
-│           └── .SRCINFO
-├── scripts/
-│   └── build_binary.sh
-└── src/
-    └── diskman/
-        ├── __init__.py
-        ├── cli.py
-        ├── core.py
-        └── tui.py
-```
+---
 
-## Requirements
+## 🚀 Key Features
 
-- Linux
-- Python 3.9+
-- System tools: `lsblk`, `findmnt`, `mount`, `umount`
-- For LUKS: `cryptsetup`
-- For SMART: `smartctl` from `smartmontools`
-- `sudo` for mount/unmount/crypt actions
+- **Dual Interface:** Full-featured Command Line Interface (CLI) and an interactive Terminal User Interface (TUI).
+- **Smart Automount:** Filesystem-aware mount options (e.g., `discard` for SSDs, UID/GID mapping for FAT/NTFS).
+- **LUKS Support:** Auto-detection, unlocking, and locking of encrypted partitions.
+- **Health Monitoring:** Real-time SMART health status visibility (via `smartmontools`).
+- **Safety First:** Automatically excludes root partitions from destructive operations and provides a **read-only fallback** if a writable mount fails.
+- **Non-Blocking Ops:** Asynchronous mount, unmount, and LUKS operations to keep the TUI responsive.
+- **Persistence:** Easily toggle reboot-persistent mounts via tagged `/etc/fstab` entries.
+- **System Integration:** Ready-to-use `systemd` service and timer for periodic automounting.
 
-## Installation
+---
+
+## 📦 Installation
 
 ### From PyPI (Recommended)
 
-Anyone can install `diskman` directly with:
+Install the latest stable version directly from PyPI:
 
 ```bash
 python3 -m pip install --upgrade diskman
 ```
 
-Then run:
-
-```bash
-diskman --help
-```
-
 ### From Source
 
 ```bash
-git clone https://github.com/gaffer/disk-manager
+git clone https://github.com/SoyalIslam/disk-manager.git
 cd disk-manager
 python3 -m pip install .
 ```
 
-## CLI Usage
+### Requirements
 
-```bash
-diskman list
-diskman automount --dry-run
-sudo diskman automount
-sudo diskman automount --async
-sudo diskman mount /dev/sdb1
-sudo diskman mount /dev/sdb1 --async
-sudo diskman umount /dev/sdb1
-sudo diskman umount /dev/sdb1 --lock-luks
-sudo diskman luks-unlock /dev/sdb2
-sudo diskman luks-lock /dev/sdb2
-diskman boot-list
-sudo diskman boot-add /dev/sdb1
-sudo diskman boot-remove /dev/sdb1
-sudo diskman tui
-```
+- **OS:** Linux
+- **Python:** 3.9+
+- **System Tools:** `util-linux` (`lsblk`, `findmnt`, `mount`, `umount`)
+- **Optional Tools:**
+  - `cryptsetup` (for LUKS support)
+  - `smartmontools` (for SMART health monitoring)
 
-## TUI Controls
+---
 
-- `j`/`k` or arrow keys: select device
-- `r`: refresh
-- `a`: async automount
-- `m`: async mount/unmount (prompts for LUKS passphrase when needed)
-- `u`: async unlock selected LUKS device
-- `l`: async lock selected LUKS device
-- `p`: toggle persistent reboot auto-mount
-- `q`: quit
+## 🛠 Usage
 
-## systemd Integration
+### CLI Reference
 
-Install units:
+| Command | Description |
+| :--- | :--- |
+| `diskman list` | List all partitions, filesystems, and mount status. |
+| `diskman tui` | Launch the interactive Terminal User Interface. |
+| `sudo diskman automount` | Auto-mount all available partitions (excluding root). |
+| `sudo diskman mount /dev/sdb1` | Mount a specific device (prompts for LUKS if needed). |
+| `sudo diskman umount /dev/sdb1` | Unmount a specific device. |
+| `sudo diskman luks-unlock /dev/sdb2` | Unlock a LUKS encrypted partition. |
+| `sudo diskman boot-add /dev/sdb1` | Enable reboot-persistent mount in `/etc/fstab`. |
 
-```bash
-sudo install -Dm644 extras/systemd/diskman-automount.service /etc/systemd/system/diskman-automount.service
-sudo install -Dm644 extras/systemd/diskman-automount.timer /etc/systemd/system/diskman-automount.timer
-```
+*Note: Operations that modify system state (mount/unmount/LUKS/fstab) require `sudo`.*
 
-Enable periodic automount:
+### TUI Controls
 
-```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now diskman-automount.timer
-```
+Launch with `diskman tui` (or `sudo diskman tui` for full functionality):
 
-Optional one-shot run:
+- **`j` / `k`** or **Arrow Keys**: Navigate device list.
+- **`m`**: Mount or unmount the selected partition.
+- **`u` / `l`**: Unlock or lock a LUKS partition.
+- **`a`**: Trigger a background automount of all devices.
+- **`p`**: Toggle persistence (`/etc/fstab`) for the selected device.
+- **`r`**: Refresh the device list.
+- **`q`**: Exit.
 
-```bash
-sudo systemctl start diskman-automount.service
-```
+---
 
-## AUR Packaging
+## ⚙️ System Integration
 
-Files are in `extras/packaging/aur/`:
-- `extras/packaging/aur/PKGBUILD`
-- `extras/packaging/aur/.SRCINFO`
+### Periodic Automount (systemd)
 
-If you publish tags (for example `v0.2.1`), users can build via `makepkg -si` from the AUR package directory.
+You can automate mounting of external drives using the provided systemd units:
 
-## Build Standalone Binary
+1. **Install Units:**
+   ```bash
+   sudo install -Dm644 extras/systemd/diskman-automount.service /etc/systemd/system/
+   sudo install -Dm644 extras/systemd/diskman-automount.timer /etc/systemd/system/
+   ```
 
-```bash
-./scripts/build_binary.sh
-./bin/diskman
-```
+2. **Enable Timer:**
+   ```bash
+   sudo systemctl daemon-reload
+   sudo systemctl enable --now diskman-automount.timer
+   ```
 
-## Development & Publishing
+---
 
-### 0. Prepare environment
+## 🏗 Development
+
+### Setup Environment
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
-python -m pip install --upgrade pip
-python -m pip install -r requirements-dev.txt
+pip install -r requirements-dev.txt
 ```
 
-### 1. Publish to PyPI
+### Build & Package
 
 ```bash
-export TWINE_USERNAME=__token__
-export TWINE_PASSWORD='pypi-xxxxxxxxxxxxxxxx'
-./scripts/publish_pypi.sh
+# Build distribution archives
+python3 -m build
+
+# Build standalone binary (via PyInstaller)
+./scripts/build_binary.sh
 ```
 
-TestPyPI publish (recommended first):
+---
 
-```bash
-export TWINE_USERNAME=__token__
-export TWINE_PASSWORD='pypi-xxxxxxxxxxxxxxxx'
-export REPOSITORY_URL='https://test.pypi.org/legacy/'
-./scripts/publish_pypi.sh
-```
+## 📄 License
 
-### 2. Build release binary asset
+This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) file for details.
 
-```bash
-./scripts/package_release_binary.sh 0.2.1
-```
+## 🤝 Contributing
 
-This creates:
-
-- `release/diskman-linux-x86_64`
-- `release/diskman-linux-x86_64-v0.2.1.tar.gz`
-- sha256 files for both artifacts
-
-Upload `diskman-linux-x86_64` (or tar.gz) to GitHub Release tag `v0.2.1`.
-
-### 3. End-user direct binary install
-
-Anyone can install your binary without Python project setup:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/gaffer/disk-manager/main/scripts/install_binary.sh -o /tmp/install_diskman.sh
-bash /tmp/install_diskman.sh 0.2.1 gaffer/disk-manager
-```
-
-Or locally:
-
-```bash
-./scripts/install_binary.sh 0.2.1 gaffer/disk-manager
-```
+Contributions, issues, and feature requests are welcome! Feel free to check the [issues page](https://github.com/SoyalIslam/disk-manager/issues).
