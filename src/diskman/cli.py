@@ -12,6 +12,8 @@ from diskman.core import (
     automount,
     automount_async,
     collect_partitions,
+    create_partition,
+    delete_partition,
     disable_persistent_mount,
     enable_persistent_mount,
     find_partition,
@@ -21,6 +23,7 @@ from diskman.core import (
     lock_luks,
     mount_partition,
     mount_partition_async,
+    merge_with_unallocated,
     persistent_mount_map,
     require_root,
     root_sources,
@@ -105,7 +108,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--base-dir",
         default=str(DEFAULT_BASE_DIR),
-        help="Base mount directory for auto/manual mounts (default: /mnt/auto)",
+        help="Base mount directory for auto/manual mounts (default: /run/media/<user>)",
     )
 
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -131,6 +134,31 @@ def build_parser() -> argparse.ArgumentParser:
 
     boot_rm = sub.add_parser("boot-remove", help="Disable reboot auto-mount for one device")
     boot_rm.add_argument("device", help="Device path, e.g. /dev/sdb1")
+
+    part_create = sub.add_parser("part-create", help="Create a new partition and format it")
+    part_create.add_argument("disk", help="Disk path, e.g. /dev/sdb")
+    part_create.add_argument(
+        "--fs",
+        required=True,
+        help="Filesystem: ntfs, btrfs, exfat, vfat, ext4, xfs, f2fs",
+    )
+    part_create.add_argument("--label", help="Filesystem label/volume name")
+    part_create.add_argument(
+        "--size",
+        help="Partition size (IEC format), e.g. 10G, 512M. Default: use all remaining free space",
+    )
+    part_create.add_argument(
+        "--start-mib",
+        type=float,
+        help="Optional start offset in MiB (must be in free space). Default: start of largest free span",
+    )
+
+    part_delete = sub.add_parser("part-delete", help="Delete an existing partition")
+    part_delete.add_argument("device", help="Partition path, e.g. /dev/sdb1")
+    part_delete.add_argument("--wipefs", action="store_true", help="Also wipe filesystem signatures after delete")
+
+    part_merge = sub.add_parser("part-merge", help="Merge adjacent right-side unallocated space into a partition")
+    part_merge.add_argument("device", help="Partition path, e.g. /dev/sdb1")
 
     luks_unlock = sub.add_parser("luks-unlock", help="Unlock a LUKS device")
     luks_unlock.add_argument("device", help="LUKS device path, e.g. /dev/sdb2")
@@ -223,6 +251,29 @@ def main(argv: list[str] | None = None) -> int:
             if not part:
                 raise CommandError(f"Device not found: {args.device}")
             print(disable_persistent_mount(part))
+            return 0
+
+        if args.cmd == "part-create":
+            require_root()
+            print(
+                create_partition(
+                    args.disk,
+                    filesystem=args.fs,
+                    label=args.label,
+                    size=args.size,
+                    start_mib=args.start_mib,
+                )
+            )
+            return 0
+
+        if args.cmd == "part-delete":
+            require_root()
+            print(delete_partition(args.device, wipe_signatures=args.wipefs))
+            return 0
+
+        if args.cmd == "part-merge":
+            require_root()
+            print(merge_with_unallocated(args.device))
             return 0
 
         if args.cmd == "luks-unlock":

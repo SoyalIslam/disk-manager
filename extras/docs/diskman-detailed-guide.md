@@ -7,6 +7,7 @@ Diskman is a Linux disk and partition manager built for terminal environments. I
 - A command-line interface (CLI)
 - A terminal user interface (TUI)
 - Smart default mount behavior
+- Partition create/delete/merge operations
 - LUKS encrypted device detection and unlock flow
 - SMART health visibility
 - Reboot-persistent mount toggling via `/etc/fstab`
@@ -49,6 +50,12 @@ When mounting, Diskman builds mount options based on filesystem and disk charact
 - `ntfs3`: sets `uid`, `gid`, and `windows_names`
 
 This keeps mount behavior more useful than generic `mount /dev/xyz /mnt/foo` defaults.
+
+Filesystem normalization and explicit mount type behavior:
+
+- `fuseblk`, `ntfs`, `ntfs3g` -> `ntfs3`
+- `fat`, `fat16`, `fat32` -> `vfat`
+- Filesystem is detected from the real mount source (`blkid`, fallback `lsblk`) and mounted with `mount -t <fstype>`
 
 ## 3.2 SSD/HDD Detection
 
@@ -118,6 +125,9 @@ Diskman uses a thread pool for background operations:
 - `umount_partition_async`
 - `unlock_luks_async`
 - `lock_luks_async`
+- `create_partition_async`
+- `delete_partition_async`
+- `merge_with_unallocated_async`
 
 TUI remains responsive while operations run. Current action is shown in status line.
 
@@ -160,11 +170,14 @@ Timer periodically triggers one-shot automount execution.
 - `diskman boot-list`
 - `diskman boot-add <device>`
 - `diskman boot-remove <device>`
+- `diskman part-create <disk> --fs <fs> [--label <label>] [--size <size>] [--start-mib <offset>]`
+- `diskman part-delete <device> [--wipefs]`
+- `diskman part-merge <device>`
 - `diskman luks-unlock <device>`
 - `diskman luks-lock <device>`
 - `diskman tui`
 
-All mount/umount/luks-write actions require root.
+All state-changing actions (mount/umount/luks/partition create-delete-merge/fstab writes) require root.
 
 ## 5. TUI Interaction Model
 
@@ -177,6 +190,9 @@ Current keybindings:
 - `u`: async unlock selected LUKS partition
 - `l`: async lock selected LUKS partition
 - `p`: toggle persistent reboot auto-mount
+- `c`: create partition (disk prompt + filesystem mini-menu + params)
+- `d`: delete selected partition
+- `g`: merge selected partition with adjacent right-side unallocated space
 - `q`: quit
 
 Displayed columns include:
@@ -236,6 +252,24 @@ sudo diskman mount /dev/sdb2
 sudo diskman boot-add /dev/sdb1
 ```
 
+### 7.6 Create a New Partition
+
+```bash
+sudo diskman part-create /dev/sdb --fs ntfs --label DATA --size 100G
+```
+
+### 7.7 Delete a Partition
+
+```bash
+sudo diskman part-delete /dev/sdb3
+```
+
+### 7.8 Merge Adjacent Unallocated Space into a Partition
+
+```bash
+sudo diskman part-merge /dev/sdb2
+```
+
 ## 8. Failure Handling and Diagnostics
 
 Common conditions and behavior:
@@ -244,6 +278,7 @@ Common conditions and behavior:
 - Read-write mount failure -> read-only fallback attempted
 - Locked LUKS mount without passphrase -> explicit locked message
 - Root partition selection -> operation refused for safety
+- Partition merge without adjacent right-side free space -> operation refused
 
 For deeper diagnostics, check:
 
@@ -265,6 +300,7 @@ For deeper diagnostics, check:
 - SMART availability depends on hardware/controller access
 - Some encrypted layouts may require advanced mapper handling
 - Read-only fallback is intentional and may occur on dirty or inconsistent filesystems
+- `part-merge` changes partition boundaries; filesystem growth may require filesystem-specific tools
 - TUI behavior depends on terminal capabilities (curses support)
 
 ## 11. Summary

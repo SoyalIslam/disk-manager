@@ -7,6 +7,8 @@ from pathlib import Path
 from .core import (
     automount_async,
     collect_partitions,
+    create_partition_async,
+    delete_partition_async,
     disable_persistent_mount,
     enable_persistent_mount,
     is_mount_read_only,
@@ -15,6 +17,7 @@ from .core import (
     is_root_partition,
     lock_luks_async,
     mount_partition_async,
+    merge_with_unallocated_async,
     persistent_mount_map,
     require_root,
     root_sources,
@@ -47,13 +50,66 @@ def _prompt_hidden(stdscr, y: int, x: int, prompt: str) -> str:
     return "".join(buf)
 
 
+def _prompt_line(stdscr, y: int, x: int, prompt: str) -> str:
+    curses.echo()
+    curses.curs_set(1)
+    stdscr.nodelay(False)
+    try:
+        stdscr.move(y, x)
+        stdscr.clrtoeol()
+        stdscr.addstr(y, x, prompt)
+        stdscr.refresh()
+        raw = stdscr.getstr(y, x + len(prompt), 256)
+        return raw.decode("utf-8", errors="ignore").strip()
+    finally:
+        curses.noecho()
+        curses.curs_set(0)
+        stdscr.nodelay(True)
+
+
+def _select_menu(stdscr, title: str, options: list[str]) -> str | None:
+    if not options:
+        return None
+
+    idx = 0
+    stdscr.nodelay(False)
+    try:
+        while True:
+            h, w = stdscr.getmaxyx()
+            start_row = min(h - 2, 4)
+            stdscr.move(start_row - 1, 0)
+            stdscr.clrtoeol()
+            stdscr.addnstr(start_row - 1, 0, f"{title} (Enter=select, q/Esc=cancel)", w - 1)
+            for i, opt in enumerate(options):
+                row = start_row + i
+                if row >= h:
+                    break
+                marker = ">" if i == idx else " "
+                stdscr.move(row, 0)
+                stdscr.clrtoeol()
+                stdscr.addnstr(row, 0, f"{marker} {opt}", w - 1)
+            stdscr.refresh()
+
+            key = stdscr.getch()
+            if key in (10, 13):
+                return options[idx]
+            if key in (27, ord("q")):
+                return None
+            if key in (curses.KEY_DOWN, ord("j")):
+                idx = min(idx + 1, len(options) - 1)
+            elif key in (curses.KEY_UP, ord("k")):
+                idx = max(idx - 1, 0)
+    finally:
+        stdscr.nodelay(True)
+
+
 def run_tui(base_dir: Path) -> None:
     def tui(stdscr) -> None:
         curses.curs_set(0)
         stdscr.nodelay(True)
         stdscr.keypad(True)
         index = 0
-        nav = "r:refresh a:auto m:mount/unmount u:unlock l:lock p:boot q:quit"
+        nav = "r:refresh a:auto m:mount/unmount u:unlock l:lock p:boot c:create d:delete g:merge-free q:quit"
         status = "Ready"
         parts = collect_partitions()
         pending: Future | None = None
@@ -207,5 +263,75 @@ def run_tui(base_dir: Path) -> None:
                 except Exception as exc:
                     status = f"Error: {exc}"
                 parts = collect_partitions()
+            elif key == ord("c") and not pending:
+                try:
+                    require_root()
+                    status = "Create partition: provide disk and filesystem"
+                    stdscr.addnstr(2, 0, f"Result: {status}", w - 1)
+                    stdscr.refresh()
+
+                    disk = _prompt_line(stdscr, min(h - 1, 3), 0, "Disk path (/dev/sdX or /dev/nvmeXnY): ")
+                    fs = _select_menu(stdscr, "Select filesystem", ["ntfs", "btrfs", "exfat", "vfat", "ext4", "xfs", "f2fs"])
+                    if not fs:
+                        status = "Create canceled"
+                        parts = collect_partitions()
+                        index = min(index, max(len(parts) - 1, 0))
+                        continue
+                    label = _prompt_line(stdscr, min(h - 1, 3), 0, "Label (optional): ")
+                    size = _prompt_line(stdscr, min(h - 1, 3), 0, "Size (optional, e.g. 100G): ")
+                    start_mib_raw = _prompt_line(stdscr, min(h - 1, 3), 0, "Start MiB (optional): ")
+
+                    start_mib = None
+                    if start_mib_raw:
+                        try:
+                            start_mib = float(start_mib_raw)
+                        except ValueError:
+                            raise ValueError(f"Invalid Start MiB value: {start_mib_raw}")
+
+                    pending = create_partition_async(
+                        disk=disk,
+                        filesystem=fs,
+                        label=label or None,
+                        size=size or None,
+                        start_mib=start_mib,
+                    )
+                    pending_action = f"create partition on {disk}"
+                    status = f"Started {pending_action}"
+                except Exception as exc:
+                    status = f"Error: {exc}"
+                parts = collect_partitions()
+                index = min(index, max(len(parts) - 1, 0))
+            elif key == ord("d") and parts and not pending:
+                part = parts[index]
+                try:
+                    require_root()
+                    confirm = _prompt_line(stdscr, min(h - 1, 3), 0, f"Type DELETE to remove {part.path}: ")
+                    if confirm != "DELETE":
+                        status = "Delete canceled"
+                    else:
+                        wipe = _prompt_line(stdscr, min(h - 1, 3), 0, "Wipe signatures first? (y/N): ")
+                        wipe_signatures = wipe.strip().lower() in {"y", "yes"}
+                        pending = delete_partition_async(part.path, wipe_signatures=wipe_signatures)
+                        pending_action = f"delete {part.path}"
+                        status = f"Started {pending_action}"
+                except Exception as exc:
+                    status = f"Error: {exc}"
+                parts = collect_partitions()
+                index = min(index, max(len(parts) - 1, 0))
+            elif key == ord("g") and parts and not pending:
+                part = parts[index]
+                try:
+                    require_root()
+                    confirm = _prompt_line(stdscr, min(h - 1, 3), 0, f"Type MERGE to expand {part.path}: ")
+                    if confirm != "MERGE":
+                        status = "Merge canceled"
+                    else:
+                        pending = merge_with_unallocated_async(part.path)
+                        pending_action = f"merge-free {part.path}"
+                        status = f"Started {pending_action}"
+                except Exception as exc:
+                    status = f"Error: {exc}"
+                parts = collect_partitions()
+                index = min(index, max(len(parts) - 1, 0))
 
     curses.wrapper(tui)

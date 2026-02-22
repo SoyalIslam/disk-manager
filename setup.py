@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 from pathlib import Path
 
 # Extract version from src/diskman/__init__.py
-version = "0.2.1"
+version = "0.2.3"
 init_file = Path(__file__).parent / "src" / "diskman" / "__init__.py"
 if init_file.exists():
     for line in init_file.read_text(encoding="utf-8").splitlines():
@@ -14,7 +14,7 @@ setup(
     name="diskman",
     version=version,
     author="Gaffer",
-    description="CLI + TUI disk manager with SMART, LUKS, and non-blocking automount",
+    description="CLI + TUI disk/partition manager with SMART, LUKS, mount controls, and partition operations",
     long_description=Path("README.md").read_text(encoding="utf-8"),
     long_description_content_type="text/markdown",
     url="https://github.com/gaffer/disk-manager",
@@ -49,5 +49,5 @@ setup(
         "Topic :: System :: Systems Administration",
         "Topic :: Utilities",
     ],
-    keywords="linux, disk, partition, mount, luks, smart, tui, cli",
+    keywords="linux, disk, partition, mount, luks, smart, tui, cli, ntfs3, parted, resize",
 )
