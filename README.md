@@ -47,16 +47,11 @@ disk-manager/
 - For SMART: `smartctl` from `smartmontools`
 - `sudo` for mount/unmount/crypt actions
 
-## Install From Source
+## Installation
 
-```bash
-cd /home/gaffer/Documents/disk-manager
-python3 -m pip install .
-```
+### From PyPI (Recommended)
 
-## Install From PyPI (for everyone)
-
-After you publish to PyPI, anyone can install directly with:
+Anyone can install `diskman` directly with:
 
 ```bash
 python3 -m pip install --upgrade diskman
@@ -66,6 +61,14 @@ Then run:
 
 ```bash
 diskman --help
+```
+
+### From Source
+
+```bash
+git clone https://github.com/gaffer/disk-manager
+cd disk-manager
+python3 -m pip install .
 ```
 
 ## CLI Usage
@@ -131,29 +134,17 @@ If you publish tags (for example `v0.2.1`), users can build via `makepkg -si` fr
 ## Build Standalone Binary
 
 ```bash
-cd /home/gaffer/Documents/disk-manager
 ./scripts/build_binary.sh
 ./bin/diskman
 ```
 
-Install locally as plain `diskman` command:
+## Development & Publishing
 
-```bash
-./scripts/install_local_binary.sh
-diskman --help
-```
-
-Note:
-- You can run read-only commands (like `diskman list` and opening `diskman tui`) without `sudo`.
-- Privileged operations (mount/umount/luks lock-unlock/boot-add-remove) still require `sudo` on Linux.
-
-## Publish Package + Binary Releases
-
-### 0. Prepare publish environment
+### 0. Prepare environment
 
 ```bash
 python3 -m venv .venv
-. .venv/bin/activate
+source .venv/bin/activate
 python -m pip install --upgrade pip
 python -m pip install -r requirements-dev.txt
 ```
