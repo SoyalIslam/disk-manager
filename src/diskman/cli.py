@@ -140,7 +140,7 @@ def build_parser() -> argparse.ArgumentParser:
     part_create.add_argument(
         "--fs",
         required=True,
-        help="Filesystem: ntfs, btrfs, exfat, vfat, ext4, xfs, f2fs",
+        help="Filesystem: ntfs, btrfs, exfat, vfat (FAT32), ext2, ext3, ext4, xfs, f2fs, nilfs2, reiserfs, udf",
     )
     part_create.add_argument("--label", help="Filesystem label/volume name")
     part_create.add_argument(
@@ -225,6 +225,7 @@ def main(argv: list[str] | None = None) -> int:
             return 0
 
         if args.cmd == "tui":
+            require_root()
             run_tui(base_dir)
             return 0
 

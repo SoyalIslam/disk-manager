@@ -105,6 +105,19 @@ def _select_menu(stdscr, title: str, options: list[str]) -> str | None:
 
 def run_tui(base_dir: Path) -> None:
     def tui(stdscr) -> None:
+        # Check root permission at TUI startup
+        try:
+            require_root()
+        except Exception as exc:
+            stdscr.erase()
+            h, w = stdscr.getmaxyx()
+            error_msg = f"Error: {exc}"
+            stdscr.addnstr(0, 0, error_msg, w - 1)
+            stdscr.addnstr(1, 0, "Please run with sudo: sudo diskman tui", w - 1)
+            stdscr.refresh()
+            curses.napms(2000)
+            raise
+
         curses.curs_set(0)
         stdscr.nodelay(True)
         stdscr.keypad(True)
@@ -271,7 +284,7 @@ def run_tui(base_dir: Path) -> None:
                     stdscr.refresh()
 
                     disk = _prompt_line(stdscr, min(h - 1, 3), 0, "Disk path (/dev/sdX or /dev/nvmeXnY): ")
-                    fs = _select_menu(stdscr, "Select filesystem", ["ntfs", "btrfs", "exfat", "vfat", "ext4", "xfs", "f2fs"])
+                    fs = _select_menu(stdscr, "Select filesystem", ["ntfs", "btrfs", "exfat", "vfat", "ext2", "ext3", "ext4", "xfs", "f2fs", "nilfs2", "reiserfs", "udf"])
                     if not fs:
                         status = "Create canceled"
                         parts = collect_partitions()

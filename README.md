@@ -46,7 +46,7 @@ python3 -m pip install .
 - **Python:** 3.9+
 - **System Tools:** `util-linux` (`lsblk`, `findmnt`, `mount`, `umount`)
 - **Partitioning Tools:** `parted`, `partprobe`, `udevadm`
-- **Filesystem Tools:** `mkfs.ntfs`, `mkfs.btrfs`, `mkfs.exfat`, `mkfs.vfat` (or `mkfs` for `ext4`/`xfs`/`f2fs`)
+- **Filesystem Tools:** `mkfs.ntfs`, `mkfs.btrfs`, `mkfs.exfat`, `mkfs.vfat`, `mkfs.ext2`, `mkfs.ext3`, `mkfs.ext4`, `mkfs.xfs`, `mkfs.f2fs`, `mkfs.nilfs2`, `mkfs.reiserfs`, `mkudffs`
 - **Optional Tools:**
   - `cryptsetup` (for LUKS support)
   - `smartmontools` (for SMART health monitoring)

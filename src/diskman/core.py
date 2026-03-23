@@ -48,9 +48,14 @@ class CommandError(RuntimeError):
 SUPPORTED_MKFS = {
     "btrfs",
     "exfat",
+    "ext2",
+    "ext3",
     "ext4",
     "f2fs",
+    "nilfs2",
     "ntfs3",
+    "reiserfs",
+    "udf",
     "vfat",
     "xfs",
 }
@@ -113,12 +118,16 @@ def _pick_mount_options(part: Partition, read_only: bool = False) -> str:
         opts.append("ro")
 
     fs = part.fstype.lower()
-    if fs in {"ext4", "xfs", "btrfs", "f2fs"} and part.disk_kind == "SSD":
+    if fs in {"ext4", "xfs", "btrfs", "f2fs", "ext3", "ext2"} and part.disk_kind == "SSD":
         opts.append("discard")
-    if fs in {"vfat", "fat", "fat32", "exfat"}:
+    if fs in {"vfat", "fat", "fat32", "exfat", "fat16", "fat12"}:
         opts.extend([f"uid={uid}", f"gid={gid}", "umask=022"])
     if fs == "ntfs3":
         opts.extend([f"uid={uid}", f"gid={gid}", "windows_names"])
+    if fs in {"udf", "iso9660"}:
+        opts.append("ro")
+    if fs == "reiserfs":
+        opts.append("nobarrier")
 
     # Keep order stable and unique.
     return ",".join(dict.fromkeys(opts))
@@ -238,6 +247,10 @@ def canonical_fstype(fstype: str) -> str:
         return "ntfs3"
     if raw in {"fat", "fat16", "fat32"}:
         return "vfat"
+    if raw in {"exfat", "fat12"}:
+        return "exfat"
+    if raw == "udf":
+        return "udf"
     return raw
 
 
@@ -278,6 +291,41 @@ def _mkfs_cmd_for(fs: str, device: str, label: str | None = None) -> List[str]:
         cmd = ["mkfs.vfat", "-F", "32"]
         if label:
             cmd.extend(["-n", label])
+        cmd.append(device)
+        return cmd
+
+    if mkfs_target == "ext2":
+        cmd = ["mkfs.ext2"]
+        if label:
+            cmd.extend(["-L", label])
+        cmd.append(device)
+        return cmd
+
+    if mkfs_target == "ext3":
+        cmd = ["mkfs.ext3"]
+        if label:
+            cmd.extend(["-L", label])
+        cmd.append(device)
+        return cmd
+
+    if mkfs_target == "nilfs2":
+        cmd = ["mkfs.nilfs2"]
+        if label:
+            cmd.extend(["-n", label])
+        cmd.append(device)
+        return cmd
+
+    if mkfs_target == "reiserfs":
+        cmd = ["mkfs.reiserfs", "-f"]
+        if label:
+            cmd.extend(["-l", label])
+        cmd.append(device)
+        return cmd
+
+    if mkfs_target == "udf":
+        cmd = ["mkudffs"]
+        if label:
+            cmd.extend(["--lvid", label])
         cmd.append(device)
         return cmd
 
