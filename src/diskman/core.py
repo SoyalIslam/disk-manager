@@ -575,9 +575,11 @@ def is_mountable(part: Partition) -> bool:
 
 
 def target_mount_point(part: Partition, base_dir: Path) -> Path:
+    # Use the actual drive label if available, otherwise fall back to device name.
     preferred = (part.label or part.name or Path(part.path).name).strip()
-    # Keep mountpoint names filesystem-safe and predictable across devices.
-    mount_name = sub(r"[^\w.+-]+", "_", preferred).strip("._-")
+    # Only sanitize characters that are invalid in Linux paths (null byte and forward slash).
+    # Preserve the actual drive label name as-is for better user experience.
+    mount_name = preferred.replace("/", "_").replace("\x00", "")
     if not mount_name:
         mount_name = Path(part.path).name
     return base_dir / mount_name
