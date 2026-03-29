@@ -1,6 +1,6 @@
 # Maintainer: Your Name <you@example.com>
 pkgname=diskman
-pkgver=0.2.1
+pkgver=0.2.6
 pkgrel=1
 pkgdesc='CLI + TUI disk manager with SMART, LUKS, and automount helpers'
 arch=('any')

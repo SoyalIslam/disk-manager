@@ -150,8 +150,8 @@ Workflow usage:
    - Push tag `vX.Y.Z` matching `pyproject.toml` version
 
 ```bash
-git tag v0.2.1
-git push origin v0.2.1
+git tag v0.2.6
+git push origin v0.2.6
 ```
 
 ---

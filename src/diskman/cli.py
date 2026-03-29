@@ -6,6 +6,7 @@ import io
 import sys
 from pathlib import Path
 
+from diskman import __version__
 from diskman.core import (
     DEFAULT_BASE_DIR,
     CommandError,
@@ -17,6 +18,7 @@ from diskman.core import (
     disable_persistent_mount,
     enable_persistent_mount,
     find_partition,
+    is_fstab_managed,
     is_luks_open,
     is_mountable,
     is_root_partition,
@@ -47,6 +49,10 @@ def _flags_for_part(p, roots, boot_map):
         flags.append("LUKS_OPEN" if is_luks_open(p) else "LUKS_LOCKED")
     if p.uuid and p.uuid in boot_map:
         flags.append("AUTOBOOT")
+    if is_fstab_managed(p):
+        flags.append("FSTAB")
+    if p.has_children:
+        flags.append("CONTAINER")
     return flags
 
 
@@ -104,6 +110,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="diskman",
         description="CLI + TUI disk/partition manager with auto-mount (excluding root).",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {__version__}",
     )
     parser.add_argument(
         "--base-dir",

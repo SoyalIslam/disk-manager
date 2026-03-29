@@ -11,6 +11,7 @@ from .core import (
     delete_partition_async,
     disable_persistent_mount,
     enable_persistent_mount,
+    is_fstab_managed,
     is_mount_read_only,
     is_luks_open,
     is_mountable,
@@ -122,7 +123,7 @@ def run_tui(base_dir: Path) -> None:
         stdscr.nodelay(True)
         stdscr.keypad(True)
         index = 0
-        nav = "r:refresh a:auto m:mount/unmount u:unlock l:lock p:boot c:create d:delete g:merge-free q:quit"
+        nav = "r:refresh a:auto m:mount/unmount u:unlock l:lock p:auto-mount-disk-boot c:create d:delete g:merge-free q:quit"
         status = "Ready"
         parts = collect_partitions()
         pending: Future | None = None
@@ -175,6 +176,10 @@ def run_tui(base_dir: Path) -> None:
                     flags.append("LUKS_OPEN" if is_luks_open(part) else "LUKS_LOCKED")
                 if part.uuid and part.uuid in boot_map:
                     flags.append("AUTOBOOT")
+                if is_fstab_managed(part):
+                    flags.append("FSTAB")
+                if part.has_children:
+                    flags.append("CONTAINER")
                 line = (
                     f"{marker} {part.path:<16} {part.disk_kind:<3} {part.fstype or '-':<10} {part.size or '-':<7} "
                     f"{smart_health(part):<8} {part.mountpoint or '-':<16} {','.join(flags) or '-'}"

@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 from pathlib import Path
 
 # Extract version from src/diskman/__init__.py
-version = "0.2.3"
+version = "0.2.6"
 init_file = Path(__file__).parent / "src" / "diskman" / "__init__.py"
 if init_file.exists():
     for line in init_file.read_text(encoding="utf-8").splitlines():

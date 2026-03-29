@@ -31,6 +31,7 @@ class Partition:
     uuid: str
     size: str
     mountpoint: str
+    has_children: bool = False
 
     @property
     def mounted(self) -> bool:
@@ -528,6 +529,7 @@ def collect_partitions() -> List[Partition]:
                 continue
 
             disk_path = _physical_disk_path(node, top_path)
+            has_children = len(node.get("children", [])) > 0
             partitions.append(
                 Partition(
                     name=(node.get("name") or "").strip(),
@@ -542,6 +544,7 @@ def collect_partitions() -> List[Partition]:
                     uuid=(node.get("uuid") or "").strip(),
                     size=(node.get("size") or "").strip(),
                     mountpoint=(node.get("mountpoint") or "").strip(),
+                    has_children=has_children,
                 )
             )
 
@@ -574,6 +577,23 @@ def is_mountable(part: Partition) -> bool:
     return True
 
 
+def is_fstab_managed(part: Partition) -> bool:
+    """Check if the partition is explicitly managed in /etc/fstab."""
+    try:
+        # Check by device path
+        if run_cmd_proc(["findmnt", "--fstab", "-S", part.path]).returncode == 0:
+            return True
+        # Check by UUID
+        if part.uuid and run_cmd_proc(["findmnt", "--fstab", "-S", f"UUID={part.uuid}"]).returncode == 0:
+            return True
+        # Check by Label
+        if part.label and run_cmd_proc(["findmnt", "--fstab", "-S", f"LABEL={part.label}"]).returncode == 0:
+            return True
+    except Exception:
+        pass
+    return False
+
+
 def target_mount_point(part: Partition, base_dir: Path) -> Path:
     # Use the actual drive label if available, otherwise fall back to device name.
     preferred = (part.label or part.name or Path(part.path).name).strip()
@@ -583,6 +603,24 @@ def target_mount_point(part: Partition, base_dir: Path) -> Path:
     if not mount_name:
         mount_name = Path(part.path).name
     return base_dir / mount_name
+
+
+def _resolve_unique_mount_point(part: Partition, base_dir: Path, used: set[Path]) -> Path:
+    mnt = target_mount_point(part, base_dir)
+    if mnt not in used and not mnt.exists():
+        return mnt
+
+    # If it exists and is already a mount point for THIS partition, we can't really "automount" it again
+    # but the loop in automount will skip it anyway because part.mounted will be True if it's already mounted.
+    
+    # If it exists and is NOT a mount point, or is a mount point for something else, or is in 'used', find a new name.
+    base_name = mnt.name
+    counter = 1
+    while True:
+        candidate = base_dir / f"{base_name}_{counter}"
+        if candidate not in used and not candidate.exists():
+            return candidate
+        counter += 1
 
 
 def ensure_dir(path: Path) -> None:
@@ -660,6 +698,7 @@ def mount_partition(
     base_dir: Path,
     root_devs: set[str],
     luks_passphrase: str | None = None,
+    override_mnt: Path | None = None,
 ) -> Tuple[bool, str]:
     if is_root_partition(part, root_devs):
         return False, f"Skipping root partition: {part.path}"
@@ -680,7 +719,7 @@ def mount_partition(
     if resolved_fstype in {"", "crypto_luks"}:
         return False, f"Unable to detect mountable filesystem for {mount_source}"
 
-    mnt = target_mount_point(part, base_dir)
+    mnt = override_mnt or target_mount_point(part, base_dir)
     ensure_dir(mnt)
 
     # Try filesystem-aware rw mount first; fallback to read-only.
@@ -711,6 +750,7 @@ def automount(base_dir: Path, dry_run: bool = False) -> List[str]:
     logs: List[str] = []
     parts = collect_partitions()
     roots = root_sources()
+    used_mounts: set[Path] = set()
 
     for part in parts:
         if is_root_partition(part, roots):
@@ -719,21 +759,29 @@ def automount(base_dir: Path, dry_run: bool = False) -> List[str]:
         if not is_mountable(part):
             logs.append(f"SKIP unsupported: {part.path}")
             continue
+        if is_fstab_managed(part):
+            logs.append(f"SKIP fstab-managed: {part.path}")
+            continue
         if part.mounted:
             logs.append(f"SKIP already mounted: {part.path} -> {part.mountpoint}")
+            continue
+        if part.has_children:
+            logs.append(f"SKIP container with children: {part.path}")
             continue
         if part.is_luks and not is_luks_open(part):
             logs.append(f"SKIP locked LUKS: {part.path}")
             continue
 
-        mnt = target_mount_point(part, base_dir)
+        mnt = _resolve_unique_mount_point(part, base_dir, used_mounts)
+        used_mounts.add(mnt)
+
         if dry_run:
             logs.append(f"DRY-RUN mount {part.path} -> {mnt}")
             continue
 
         try:
             ensure_dir(mnt)
-            _, msg = mount_partition(part, base_dir, roots)
+            _, msg = mount_partition(part, base_dir, roots, override_mnt=mnt)
             logs.append(f"OK {msg}")
         except Exception as exc:
             logs.append(f"ERR mount {part.path}: {exc}")
